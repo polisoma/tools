@@ -544,16 +544,40 @@ done
 
 mkdir ~/data/data_genomes/motifs/HOCOMOCOv11; cd ~/data/data_genomes/motifs/HOCOMOCOv11
 
+# meme format includes only letter probabilities but not logg odds
+#Prior to release 4.7.0 of the MEME Suite MAST required a log-odds matrix section to be specified, however the current version of the MEME Suite is capable of translating the letter-probability matrix into the log-odds matrix and vice-versa.
+# mast -version --> 4.11.0
+
 wget http://hocomoco11.autosome.ru/final_bundle/hocomoco11/core/HUMAN/mono/HOCOMOCOv11_core_HUMAN_mono_meme_format.meme
 
-for genome in hg19; do mkdir -p mast_p03/${genome} for motif in `ls -1 mmu/ |
-sed 's/\.meme//'`; do     for chr in `cat
-~/data/data_genomes/$genome/chrom.sizes.good | cut -f1 | xargs`; do     $mast
--hit_list -mt 0.001 mmu/${motif}.meme ~/data/data_genomes/${genome}/fa/${chr}.fa
-| awk -vOFS='\t' -vM=$motif '($1!~/#/){if($2=="+1"){s="+"}else{s="-"}print
-$1,$3,$4,M,$6,s,$5}'     done | gzip > mast_p03/${genome}/${motif}.txt.gz done &
+
+mkdir -p HOCOMOCOv11_core # to store motifs to read meme files for mast.
+
+awk '{if($1=="MOTIF"){F=1;file="HOCOMOCOv11_core/"$2".meme";print file>file;print header>file;print $0>file}else if(F==1){print $0>file}else{if(!header){header=$0}else(header=header"\n"$0)}}' HOCOMOCOv11_core_HUMAN_mono_meme_format.meme 
+
+mkdir -p logo; mkdir -p mast_p03
+meme2images HOCOMOCOv11_core_HUMAN_mono_meme_format.meme logo/
+
+screen -R mast
+cd mast_p03
+
+for genome in hg19 ; do
+mkdir -p mast_p03/${genome}
+for motif in `ls -1 HOCOMOCOv11_core/ | sed 's/\.meme//'`; do
+    echo -en $motif
+    for chr in `cat /home/daria/data/data_genomes/${genome}/chrom.sizes.good | cut -f1 | xargs`; do
+    mast -hit_list -mt 0.001 HOCOMOCOv11_core/${motif}.meme /home/daria/data/data_genomes/${genome}/fa/${chr}.fa | awk -vOFS='\t' -vM=$motif '($1!~/#/){if($2=="+1"){s="+"}else{s="-"}print $1,$3,$4,M,$6,s,$5}'
+    done | gzip > mast_p03/${genome}/${motif}.txt.gz
+done &
 done
 
+# not done yet
+for genome in hg19; do
+for motif in `ls -1 jaspar_core_nonredundant_vertebrates/ | sed 's/\.meme//'`; do
+    echo $motif
+    gunzip -c mast_p03/${genome}/${motif}.txt.gz | cut -f1 | uniq | head -2
+done
+done
 
 
 
